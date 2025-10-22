@@ -18,16 +18,39 @@ Quick and easy zsh installation and configuration script with powerful features.
 
 **Everything in one command** - installs dependencies, configures zsh, and sets as default shell:
 
+#### User Installation (Recommended)
+Installs zsh configuration for the current user only:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | bash
 ```
 
-This will:
+#### System-wide Installation (Root)
+Installs zsh configuration system-wide for all users:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | sudo bash
+```
+
+**Installation will prompt you to select:**
+1. **User install** - Install for current user only (in `~/.oh-my-zsh`)
+2. **Root install** - Install system-wide for all users (in `/usr/local/share/oh-my-zsh`)
+
+**This will:**
 - ✅ Install zsh, fzf, git, curl automatically
 - ✅ Configure Oh My Zsh with plugins
 - ✅ **Migrate environment variables from .bashrc** (NVM, Claude, etc.)
 - ✅ Set zsh as your default shell
 - ✅ No manual steps required!
+
+#### Installation Modes Comparison
+
+| Feature | User Install | Root Install |
+|---------|-------------|--------------|
+| **Installation Location** | `~/.oh-my-zsh` | `/usr/local/share/oh-my-zsh` |
+| **Config File** | `~/.zshrc` | `/etc/zsh/zshrc.zsh-setup` (symlinked to `~/.zshrc`) |
+| **Available To** | Current user only | All users on the system |
+| **Requires sudo** | Only for packages & shell change | For entire installation |
+| **Command** | `... \| bash` | `... \| sudo bash` |
+| **Recommended For** | Personal systems, single user | Multi-user servers, shared systems |
 
 ### 📦 Manual Installation (if dependencies are already installed)
 
