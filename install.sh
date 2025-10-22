@@ -126,6 +126,35 @@ main() {
         print_success "zsh is already your default shell"
     fi
 
+    # Add zsh auto-start to .bashrc as fallback
+    print_step "Adding zsh fallback to .bashrc"
+    if [ -f "$HOME/.bashrc" ]; then
+        # Check if zsh auto-start is already in .bashrc
+        if ! grep -q "exec zsh" "$HOME/.bashrc" 2>/dev/null; then
+            echo ""
+            read -p "Add zsh auto-start to .bashrc? (ensures zsh starts automatically) [Y/n] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                cat >> "$HOME/.bashrc" << 'BASHRC_EOF'
+
+# Auto-start zsh if available (added by zsh-setup)
+if [ -x "$(command -v zsh)" ] && [ -z "$ZSH_VERSION" ]; then
+    export SHELL=$(which zsh)
+    exec zsh
+fi
+BASHRC_EOF
+                print_success "Added zsh auto-start to .bashrc"
+                print_info "This ensures zsh starts even if default shell change fails"
+            else
+                print_info "Skipped .bashrc modification"
+            fi
+        else
+            print_info ".bashrc already configured for zsh"
+        fi
+    else
+        print_warning ".bashrc not found, skipping fallback setup"
+    fi
+
     # Final message
     print_step "Installation complete!"
     echo ""
