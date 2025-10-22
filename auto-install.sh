@@ -54,19 +54,26 @@ detect_os() {
 
 # Prompt for installation mode
 select_install_mode() {
-    echo ""
-    echo -e "${BLUE}Select installation mode:${NC}"
-    echo "  1) User install (recommended) - Install for current user only"
-    echo "  2) Root install - Install system-wide for all users"
-    echo ""
+    # If running as root, automatically select root install
+    if [ "$EUID" -eq 0 ]; then
+        print_info "Running as root - selecting system-wide installation"
+        return 0  # Root install
+    fi
 
-    # Check if we're in non-interactive mode
+    # For non-root users, check if interactive
     if [ ! -t 0 ]; then
         print_warning "Non-interactive mode detected, defaulting to user install"
         return 1  # User install
     fi
 
-    read -p "Enter choice [1-2] (default: 1): " choice
+    # Interactive mode for non-root users
+    echo ""
+    echo -e "${BLUE}Select installation mode:${NC}"
+    echo "  1) User install (recommended) - Install for current user only"
+    echo "  2) Root install - Install system-wide for all users (requires sudo)"
+    echo ""
+
+    read -p "Enter choice [1-2] (default: 1): " choice </dev/tty
     case "$choice" in
         2)
             return 0  # Root install
@@ -111,25 +118,32 @@ main() {
     # Install dependencies based on OS
     print_step "Installing dependencies"
 
+    # Determine if we need sudo for package management
+    if [ "$EUID" -eq 0 ]; then
+        SUDO_CMD=""
+    else
+        SUDO_CMD="sudo"
+    fi
+
     case "$OS" in
         ubuntu|debian|pop)
             print_info "Installing zsh, fzf, git, and curl..."
-            if ! sudo apt update; then
+            if ! $SUDO_CMD apt update; then
                 print_error "Failed to update package list"
                 exit 1
             fi
-            if ! sudo apt install -y zsh fzf git curl; then
+            if ! $SUDO_CMD apt install -y zsh fzf git curl; then
                 print_error "Failed to install dependencies"
                 exit 1
             fi
             ;;
         fedora|rhel|centos)
             print_info "Installing zsh, fzf, git, and curl..."
-            sudo dnf install -y zsh fzf git curl || sudo yum install -y zsh fzf git curl
+            $SUDO_CMD dnf install -y zsh fzf git curl || $SUDO_CMD yum install -y zsh fzf git curl
             ;;
         arch|manjaro)
             print_info "Installing zsh, fzf, git, and curl..."
-            sudo pacman -S --noconfirm zsh fzf git curl
+            $SUDO_CMD pacman -S --noconfirm zsh fzf git curl
             ;;
         darwin)
             print_info "Installing zsh, fzf, and git via Homebrew..."
@@ -295,56 +309,44 @@ main() {
         print_info "Current shell: $CURRENT_SHELL"
         print_info "Changing to: $ZSH_PATH"
 
+        # Determine sudo command
+        if [ "$EUID" -eq 0 ]; then
+            CHSH_SUDO=""
+        else
+            CHSH_SUDO="sudo"
+        fi
+
         # Try to change shell
         if command_exists chsh; then
-            if [ "$INSTALL_MODE" = "root" ]; then
-                if chsh -s "$ZSH_PATH" "$TARGET_USER" 2>/dev/null; then
-                    print_success "Default shell changed to zsh for $TARGET_USER"
-                    print_warning "Please log out and log back in for changes to take effect"
-                else
-                    print_warning "Automatic shell change failed. Trying alternative method..."
-                    if usermod -s "$ZSH_PATH" "$TARGET_USER" 2>/dev/null; then
-                        print_success "Default shell changed to zsh (via usermod)"
-                        print_warning "Please log out and log back in for changes to take effect"
-                    else
-                        print_error "Failed to change default shell automatically."
-                        echo "Please run this command manually:"
-                        echo "  sudo chsh -s \$(which zsh) $TARGET_USER"
-                    fi
-                fi
+            if $CHSH_SUDO chsh -s "$ZSH_PATH" "$TARGET_USER" 2>/dev/null; then
+                print_success "Default shell changed to zsh for $TARGET_USER"
+                print_warning "Please log out and log back in for changes to take effect"
             else
-                if sudo chsh -s "$ZSH_PATH" "$TARGET_USER" 2>/dev/null; then
-                    print_success "Default shell changed to zsh"
+                print_warning "Automatic shell change failed. Trying alternative method..."
+                if $CHSH_SUDO usermod -s "$ZSH_PATH" "$TARGET_USER" 2>/dev/null; then
+                    print_success "Default shell changed to zsh (via usermod)"
                     print_warning "Please log out and log back in for changes to take effect"
                 else
-                    print_warning "Automatic shell change failed. Trying alternative method..."
-                    if sudo usermod -s "$ZSH_PATH" "$TARGET_USER" 2>/dev/null; then
-                        print_success "Default shell changed to zsh (via usermod)"
-                        print_warning "Please log out and log back in for changes to take effect"
+                    print_error "Failed to change default shell automatically."
+                    echo "Please run this command manually:"
+                    if [ "$EUID" -eq 0 ]; then
+                        echo "  chsh -s \$(which zsh) $TARGET_USER"
                     else
-                        print_error "Failed to change default shell automatically."
-                        echo "Please run this command manually:"
-                        echo "  sudo chsh -s \$(which zsh) \$USER"
+                        echo "  sudo chsh -s \$(which zsh) $TARGET_USER"
                     fi
                 fi
             fi
         else
             print_warning "chsh command not found. Using usermod..."
-            if [ "$INSTALL_MODE" = "root" ]; then
-                if usermod -s "$ZSH_PATH" "$TARGET_USER"; then
-                    print_success "Default shell changed to zsh"
-                    print_warning "Please log out and log back in for changes to take effect"
-                else
-                    print_error "Failed to change shell. Please run manually:"
-                    echo "  sudo usermod -s \$(which zsh) $TARGET_USER"
-                fi
+            if $CHSH_SUDO usermod -s "$ZSH_PATH" "$TARGET_USER"; then
+                print_success "Default shell changed to zsh"
+                print_warning "Please log out and log back in for changes to take effect"
             else
-                if sudo usermod -s "$ZSH_PATH" "$TARGET_USER"; then
-                    print_success "Default shell changed to zsh"
-                    print_warning "Please log out and log back in for changes to take effect"
+                print_error "Failed to change shell. Please run manually:"
+                if [ "$EUID" -eq 0 ]; then
+                    echo "  usermod -s \$(which zsh) $TARGET_USER"
                 else
-                    print_error "Failed to change shell. Please run manually:"
-                    echo "  sudo usermod -s \$(which zsh) \$USER"
+                    echo "  sudo usermod -s \$(which zsh) $TARGET_USER"
                 fi
             fi
         fi

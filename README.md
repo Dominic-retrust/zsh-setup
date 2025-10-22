@@ -23,16 +23,19 @@ Installs zsh configuration for the current user only:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | bash
 ```
+**Automatically installs to:** `~/.oh-my-zsh` (current user only)
 
 #### System-wide Installation (Root)
 Installs zsh configuration system-wide for all users:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | sudo bash
 ```
+**Automatically installs to:** `/usr/local/share/oh-my-zsh` (all users)
 
-**Installation will prompt you to select:**
-1. **User install** - Install for current user only (in `~/.oh-my-zsh`)
-2. **Root install** - Install system-wide for all users (in `/usr/local/share/oh-my-zsh`)
+**How it works:**
+- Running **without sudo**: Automatically selects user installation
+- Running **with sudo**: Automatically selects system-wide installation
+- Both methods work seamlessly with the `curl | bash` pattern!
 
 **This will:**
 - ✅ Install zsh, fzf, git, curl automatically
@@ -45,12 +48,12 @@ curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto
 
 | Feature | User Install | Root Install |
 |---------|-------------|--------------|
+| **Command** | `curl ... \| bash` | `curl ... \| sudo bash` |
 | **Installation Location** | `~/.oh-my-zsh` | `/usr/local/share/oh-my-zsh` |
-| **Config File** | `~/.zshrc` | `/etc/zsh/zshrc.zsh-setup` (symlinked to `~/.zshrc`) |
+| **Config File** | `~/.zshrc` | `/etc/zsh/zshrc.zsh-setup` → `~/.zshrc` |
 | **Available To** | Current user only | All users on the system |
-| **Requires sudo** | Only for packages & shell change | For entire installation |
-| **Command** | `... \| bash` | `... \| sudo bash` |
 | **Recommended For** | Personal systems, single user | Multi-user servers, shared systems |
+| **Auto-detected** | ✅ When not root | ✅ When running as root |
 
 ### 📦 Manual Installation (if dependencies are already installed)
 
