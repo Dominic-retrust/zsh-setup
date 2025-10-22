@@ -25,6 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto
 This will:
 - ✅ Install zsh, fzf, git, curl automatically
 - ✅ Configure Oh My Zsh with plugins
+- ✅ **Migrate environment variables from .bashrc** (NVM, Claude, etc.)
 - ✅ Set zsh as your default shell
 - ✅ No manual steps required!
 
@@ -98,6 +99,12 @@ sudo pacman -S zsh fzf git
 - Automatic deduplication
 - Shared between sessions
 - Instant append to history file
+
+### Environment Migration
+- **Automatic**: Detects and migrates important variables from `.bashrc`
+- **Supported**: NVM, Claude CLI, PyEnv, RbEnv, GOPATH, JAVA_HOME, custom PATH
+- **Smart**: Only migrates uncommented exports and source commands
+- **Safe**: Preserves original `.bashrc` file
 
 ### Completion Features
 - Case-insensitive completion

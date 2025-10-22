@@ -108,6 +108,53 @@ main() {
         print_warning "zshrc template not found, skipping"
     fi
 
+    # Migrate important environment variables from .bashrc to .zshrc
+    print_step "Migrating environment variables from .bashrc to .zshrc"
+    if [ -f "$HOME/.bashrc" ]; then
+        # Create a temporary file to store extracted variables
+        TEMP_ENV=$(mktemp)
+
+        # Extract important patterns from .bashrc
+        grep -E "^export (NVM_DIR|CLAUDE|ANTHROPIC|PYENV|RBENV|GOPATH|JAVA_HOME|ANDROID)" "$HOME/.bashrc" > "$TEMP_ENV" 2>/dev/null || true
+        grep -E "^\[ -s.*nvm\.sh" "$HOME/.bashrc" >> "$TEMP_ENV" 2>/dev/null || true
+        grep -E "^source.*(nvm|claude|pyenv|rbenv)" "$HOME/.bashrc" >> "$TEMP_ENV" 2>/dev/null || true
+        grep -E "^\. .*(nvm|claude|pyenv|rbenv)" "$HOME/.bashrc" >> "$TEMP_ENV" 2>/dev/null || true
+        grep -E "^eval.*\(.*init" "$HOME/.bashrc" >> "$TEMP_ENV" 2>/dev/null || true
+
+        # Also check for PATH modifications
+        grep -E "^export PATH=.*:" "$HOME/.bashrc" | grep -v "^#" >> "$TEMP_ENV" 2>/dev/null || true
+
+        if [ -s "$TEMP_ENV" ]; then
+            print_info "Found environment variables in .bashrc:"
+            cat "$TEMP_ENV" | while IFS= read -r line; do
+                echo "  $line"
+            done
+
+            echo ""
+            read -p "Migrate these to .zshrc? [Y/n] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                # Append to .zshrc
+                echo "" >> "$HOME/.zshrc"
+                echo "# ============================================" >> "$HOME/.zshrc"
+                echo "# Migrated from .bashrc" >> "$HOME/.zshrc"
+                echo "# ============================================" >> "$HOME/.zshrc"
+                cat "$TEMP_ENV" >> "$HOME/.zshrc"
+                echo "" >> "$HOME/.zshrc"
+
+                print_success "Migrated environment variables to .zshrc"
+            else
+                print_info "Skipped migration"
+            fi
+        else
+            print_info "No special environment variables found in .bashrc"
+        fi
+
+        rm -f "$TEMP_ENV"
+    else
+        print_warning ".bashrc not found, skipping migration"
+    fi
+
     # Set zsh as default shell (requires sudo)
     print_step "Setting zsh as default shell"
     if [ "$SHELL" != "$(which zsh)" ]; then
