@@ -14,23 +14,50 @@ Quick and easy zsh installation and configuration script with powerful features.
 
 ## Quick Install
 
+### 🚀 Full Automatic Installation (Recommended for Ubuntu/Debian)
+
+**Everything in one command** - installs dependencies, configures zsh, and sets as default shell:
+
 ```bash
-# One-line installation
+curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | bash
+```
+
+This will:
+- ✅ Install zsh, fzf, git, curl automatically
+- ✅ Configure Oh My Zsh with plugins
+- ✅ Set zsh as your default shell
+- ✅ No manual steps required!
+
+### 📦 Manual Installation (if dependencies are already installed)
+
+```bash
+# If you already have zsh and fzf installed
 curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/install.sh | bash
 ```
 
-Or clone and run:
+### 🔧 Clone and Run
 
 ```bash
 git clone https://github.com/Dominic-retrust/zsh-setup.git
 cd zsh-setup
-chmod +x install.sh
+
+# Full automatic (installs dependencies)
+./auto-install.sh
+
+# Or manual (requires zsh and fzf)
 ./install.sh
 ```
 
 ## Prerequisites
 
-The script will check for these dependencies and prompt you to install them:
+### For `auto-install.sh` (Automatic)
+- Ubuntu/Debian/Pop!_OS (will auto-install: zsh, fzf, git, curl)
+- Fedora/RHEL/CentOS (will auto-install: zsh, fzf, git, curl)
+- Arch/Manjaro (will auto-install: zsh, fzf, git, curl)
+- sudo access (for package installation)
+
+### For `install.sh` (Manual)
+You need to install these first:
 
 ### Ubuntu/Debian
 ```bash
