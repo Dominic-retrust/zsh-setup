@@ -166,24 +166,22 @@ main() {
     if [ "$INSTALL_MODE" = "root" ]; then
         OMZ_DIR="/usr/local/share/oh-my-zsh"
         ZSH_CUSTOM="$OMZ_DIR/custom"
-        TARGET_ZSHRC="/etc/zsh/zshrc.zsh-setup"
         USER_HOME=$(eval echo ~$SUDO_USER)
+        TARGET_USER="$SUDO_USER"
     else
         OMZ_DIR="$HOME/.oh-my-zsh"
         ZSH_CUSTOM="$OMZ_DIR/custom"
-        TARGET_ZSHRC="$HOME/.zshrc"
         USER_HOME="$HOME"
+        TARGET_USER="$USER"
     fi
 
+    TARGET_ZSHRC="$USER_HOME/.zshrc"
+
     # Backup existing .zshrc
-    if [ -f "$TARGET_ZSHRC" ] || [ -f "$HOME/.zshrc" ]; then
+    if [ -f "$TARGET_ZSHRC" ]; then
         print_step "Backing up existing .zshrc"
-        BACKUP_FILE="$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
-        if [ -f "$TARGET_ZSHRC" ]; then
-            cp "$TARGET_ZSHRC" "$BACKUP_FILE"
-        elif [ -f "$HOME/.zshrc" ]; then
-            cp "$HOME/.zshrc" "$BACKUP_FILE"
-        fi
+        BACKUP_FILE="$USER_HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
+        cp "$TARGET_ZSHRC" "$BACKUP_FILE"
         print_success "Backup created: $BACKUP_FILE"
     fi
 
@@ -225,82 +223,152 @@ main() {
         print_info "zsh-syntax-highlighting is already installed"
     fi
 
-    # Download and apply .zshrc configuration
-    print_step "Configuring .zshrc"
-    TEMP_ZSHRC=$(mktemp)
-    if curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/zshrc -o "$TEMP_ZSHRC"; then
-        if [ "$INSTALL_MODE" = "root" ]; then
-            # Modify paths for system-wide installation
-            sed -i "s|export ZSH=\$HOME/.oh-my-zsh|export ZSH=$OMZ_DIR|g" "$TEMP_ZSHRC"
-            cp "$TEMP_ZSHRC" "$TARGET_ZSHRC"
-            chmod 644 "$TARGET_ZSHRC"
+    # Extract user custom configurations from existing .zshrc (if exists)
+    print_step "Preserving user custom configurations"
+    USER_CUSTOM=$(mktemp)
 
-            # Create symlink in user's home
-            if [ -n "$SUDO_USER" ]; then
-                ln -sf "$TARGET_ZSHRC" "$USER_HOME/.zshrc"
-                chown -h "$SUDO_USER:$SUDO_USER" "$USER_HOME/.zshrc"
-                print_info "Created symlink: $USER_HOME/.zshrc -> $TARGET_ZSHRC"
-            fi
-        else
-            cp "$TEMP_ZSHRC" "$TARGET_ZSHRC"
+    if [ -f "$TARGET_ZSHRC" ]; then
+        # Extract content between "# User Configuration" and "# Migrated from .bashrc"
+        awk '
+        BEGIN { in_user_section=0; in_custom_section=0 }
+        /^# ============================================$/ {
+            getline
+            # Check if this is the User Configuration section
+            if ($0 ~ /^# User Configuration$/) {
+                in_user_section=1
+                getline  # Skip the next separator
+                if ($0 ~ /^# ============================================$/) {
+                    getline  # Skip "Add your custom..." line
+                }
+                next
+            }
+            # Check if this is Migrated section or User Custom Configuration
+            if ($0 ~ /^# Migrated from .bashrc$/ || $0 ~ /^# User Custom Configuration$/) {
+                in_user_section=0
+                in_custom_section=0
+            }
+        }
+        in_user_section {
+            if ($0 !~ /^# Add your custom configurations below$/) {
+                print
+            }
+        }
+        ' "$TARGET_ZSHRC" > "$USER_CUSTOM" 2>/dev/null || true
+
+        # Remove leading/trailing empty lines
+        if [ -f "$USER_CUSTOM" ]; then
+            # Remove leading empty lines
+            sed -i '/./,$!d' "$USER_CUSTOM" 2>/dev/null || true
+            # Remove trailing empty lines
+            sed -i -e :a -e '/^\s*$/{ $d; N; ba' -e '}' "$USER_CUSTOM" 2>/dev/null || true
         fi
-        rm -f "$TEMP_ZSHRC"
-        print_success ".zshrc configured at: $TARGET_ZSHRC"
+
+        if [ -s "$USER_CUSTOM" ]; then
+            print_success "Preserved $(wc -l < "$USER_CUSTOM") lines of user custom configurations"
+        else
+            print_info "No user custom configurations found in existing .zshrc"
+        fi
     else
-        rm -f "$TEMP_ZSHRC"
-        print_warning "Failed to download zshrc, using default configuration"
+        print_info "No existing .zshrc found, skipping custom configuration preservation"
     fi
 
-    # Migrate important environment variables from .bashrc to .zshrc
-    print_step "Migrating environment variables from .bashrc to .zshrc"
+    # Extract and analyze .bashrc content
+    print_step "Analyzing .bashrc configuration"
     BASHRC_FILE="$USER_HOME/.bashrc"
+    BASHRC_CONTENT=$(mktemp)
+
     if [ -f "$BASHRC_FILE" ]; then
-        # Create a temporary file to store extracted variables
-        TEMP_ENV=$(mktemp)
-
         # Extract important patterns from .bashrc
-        grep -E "^export (NVM_DIR|CLAUDE|ANTHROPIC|PYENV|RBENV|GOPATH|JAVA_HOME|ANDROID)" "$BASHRC_FILE" > "$TEMP_ENV" 2>/dev/null || true
-        grep -E "^\[ -s.*nvm\.sh" "$BASHRC_FILE" >> "$TEMP_ENV" 2>/dev/null || true
-        grep -E "^source.*(nvm|claude|pyenv|rbenv)" "$BASHRC_FILE" >> "$TEMP_ENV" 2>/dev/null || true
-        grep -E "^\. .*(nvm|claude|pyenv|rbenv)" "$BASHRC_FILE" >> "$TEMP_ENV" 2>/dev/null || true
-        grep -E "^eval.*\(.*init" "$BASHRC_FILE" >> "$TEMP_ENV" 2>/dev/null || true
+        print_info "Extracting environment variables from .bashrc..."
 
-        # Also check for PATH modifications
-        grep -E "^export PATH=.*:" "$BASHRC_FILE" | grep -v "^#" >> "$TEMP_ENV" 2>/dev/null || true
+        # Export statements for environment variables
+        grep -E "^export (NVM_DIR|CLAUDE|ANTHROPIC|PYENV|RBENV|GOPATH|JAVA_HOME|ANDROID|NODE|PYTHON|RUBY|GO|RUST|CARGO)" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
 
-        if [ -s "$TEMP_ENV" ]; then
-            print_info "Found environment variables to migrate:"
-            cat "$TEMP_ENV" | while IFS= read -r line; do
-                echo "  $line"
-            done
+        # NVM configuration
+        grep -E "^\[.*-s.*nvm\.sh.*\]" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
+        grep -E "^source.*nvm\.sh" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
+        grep -E "^\. .*nvm\.sh" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
 
-            # Append to .zshrc
-            echo "" >> "$TARGET_ZSHRC"
-            echo "# ============================================" >> "$TARGET_ZSHRC"
-            echo "# Migrated from .bashrc" >> "$TARGET_ZSHRC"
-            echo "# ============================================" >> "$TARGET_ZSHRC"
-            cat "$TEMP_ENV" >> "$TARGET_ZSHRC"
-            echo "" >> "$TARGET_ZSHRC"
+        # Other tool configurations (pyenv, rbenv, etc.)
+        grep -E "^source.*(pyenv|rbenv|cargo|rustup)" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
+        grep -E "^\. .*(pyenv|rbenv|cargo|rustup)" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
 
-            print_success "Migrated environment variables to .zshrc"
+        # Eval statements for tool initialization
+        grep -E "^eval.*\(.*init" "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
+
+        # PATH modifications (excluding comments)
+        grep -E "^export PATH=" "$BASHRC_FILE" | grep -v "^#" >> "$BASHRC_CONTENT" 2>/dev/null || true
+        grep -E "^PATH=" "$BASHRC_FILE" | grep -v "^#" >> "$BASHRC_CONTENT" 2>/dev/null || true
+
+        # Custom aliases and functions
+        grep -E "^alias " "$BASHRC_FILE" >> "$BASHRC_CONTENT" 2>/dev/null || true
+
+        # Remove duplicates while preserving order
+        awk '!seen[$0]++' "$BASHRC_CONTENT" > "$BASHRC_CONTENT.tmp"
+        mv "$BASHRC_CONTENT.tmp" "$BASHRC_CONTENT"
+
+        if [ -s "$BASHRC_CONTENT" ]; then
+            print_success "Found $(wc -l < "$BASHRC_CONTENT") lines to migrate from .bashrc"
         else
             print_info "No special environment variables found in .bashrc"
         fi
-
-        rm -f "$TEMP_ENV"
     else
-        print_warning ".bashrc not found, skipping migration"
+        print_warning ".bashrc not found, will use default configuration only"
     fi
+
+    # Download and build .zshrc configuration
+    print_step "Creating .zshrc configuration"
+    TEMP_ZSHRC=$(mktemp)
+
+    if curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/zshrc -o "$TEMP_ZSHRC"; then
+        # Modify paths based on installation mode
+        if [ "$INSTALL_MODE" = "root" ]; then
+            # Replace the ZSH path for system-wide installation
+            sed -i "s|^export ZSH=\"\$HOME/.oh-my-zsh\"|export ZSH=\"$OMZ_DIR\"|g" "$TEMP_ZSHRC"
+        fi
+
+        # Append .bashrc content if available
+        if [ -s "$BASHRC_CONTENT" ]; then
+            echo "" >> "$TEMP_ZSHRC"
+            echo "# ============================================" >> "$TEMP_ZSHRC"
+            echo "# Migrated from .bashrc" >> "$TEMP_ZSHRC"
+            echo "# ============================================" >> "$TEMP_ZSHRC"
+            cat "$BASHRC_CONTENT" >> "$TEMP_ZSHRC"
+            echo "" >> "$TEMP_ZSHRC"
+        fi
+
+        # Append user custom configurations if available
+        if [ -s "$USER_CUSTOM" ]; then
+            echo "" >> "$TEMP_ZSHRC"
+            echo "# ============================================" >> "$TEMP_ZSHRC"
+            echo "# User Custom Configuration" >> "$TEMP_ZSHRC"
+            echo "# (Preserved from previous installation)" >> "$TEMP_ZSHRC"
+            echo "# ============================================" >> "$TEMP_ZSHRC"
+            cat "$USER_CUSTOM" >> "$TEMP_ZSHRC"
+            echo "" >> "$TEMP_ZSHRC"
+            print_info "User custom configurations restored"
+        fi
+
+        # Write final .zshrc
+        cp "$TEMP_ZSHRC" "$TARGET_ZSHRC"
+
+        # Set proper ownership for root mode
+        if [ "$INSTALL_MODE" = "root" ]; then
+            chown "$SUDO_USER:$SUDO_USER" "$TARGET_ZSHRC"
+            chmod 644 "$TARGET_ZSHRC"
+        fi
+
+        print_success ".zshrc configured at: $TARGET_ZSHRC"
+    else
+        print_error "Failed to download zshrc template"
+        exit 1
+    fi
+
+    # Clean up temporary files
+    rm -f "$TEMP_ZSHRC" "$BASHRC_CONTENT" "$USER_CUSTOM"
 
     # Set zsh as default shell
     print_step "Setting zsh as default shell"
-
-    # Determine target user
-    if [ "$INSTALL_MODE" = "root" ] && [ -n "$SUDO_USER" ]; then
-        TARGET_USER="$SUDO_USER"
-    else
-        TARGET_USER="$USER"
-    fi
 
     CURRENT_SHELL=$(getent passwd "$TARGET_USER" | cut -d: -f7)
     ZSH_PATH=$(which zsh)
@@ -382,13 +450,10 @@ BASHRC_EOF
     print_success "zsh-setup completed successfully!"
     echo ""
     print_info "📦 Installation mode: ${INSTALL_MODE}"
+    echo "  • Oh My Zsh location: $OMZ_DIR"
+    echo "  • Config file: $TARGET_ZSHRC"
     if [ "$INSTALL_MODE" = "root" ]; then
-        echo "  • Oh My Zsh location: $OMZ_DIR"
-        echo "  • Config file: $TARGET_ZSHRC"
-        echo "  • User symlink: $USER_HOME/.zshrc"
-    else
-        echo "  • Oh My Zsh location: $OMZ_DIR"
-        echo "  • Config file: $TARGET_ZSHRC"
+        echo "  • User: $TARGET_USER"
     fi
     echo ""
     print_info "✨ Features installed:"

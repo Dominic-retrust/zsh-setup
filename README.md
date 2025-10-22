@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto
 **This will:**
 - ✅ Install zsh, fzf, git, curl automatically
 - ✅ Configure Oh My Zsh with plugins
-- ✅ **Migrate environment variables from .bashrc** (NVM, Claude, etc.)
+- ✅ **Analyze and migrate environment from .bashrc** (NVM, PyEnv, RbEnv, custom PATH, aliases)
 - ✅ Set zsh as your default shell
 - ✅ No manual steps required!
 
@@ -50,7 +50,8 @@ curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto
 |---------|-------------|--------------|
 | **Command** | `curl ... \| bash` | `curl ... \| sudo bash` |
 | **Installation Location** | `~/.oh-my-zsh` | `/usr/local/share/oh-my-zsh` |
-| **Config File** | `~/.zshrc` | `/etc/zsh/zshrc.zsh-setup` → `~/.zshrc` |
+| **Config File** | `~/.zshrc` (direct) | `~/.zshrc` (direct) |
+| **.bashrc Migration** | ✅ Automatic | ✅ Automatic per user |
 | **Available To** | Current user only | All users on the system |
 | **Recommended For** | Personal systems, single user | Multi-user servers, shared systems |
 | **Auto-detected** | ✅ When not root | ✅ When running as root |
@@ -127,10 +128,20 @@ sudo pacman -S zsh fzf git
 - Instant append to history file
 
 ### Environment Migration
-- **Automatic**: Detects and migrates important variables from `.bashrc`
-- **Supported**: NVM, Claude CLI, PyEnv, RbEnv, GOPATH, JAVA_HOME, custom PATH
-- **Smart**: Only migrates uncommented exports and source commands
-- **Safe**: Preserves original `.bashrc` file
+- **Automatic**: Analyzes `.bashrc` and extracts important configurations
+- **Supported**:
+  - Environment variables: NVM_DIR, PYENV, RBENV, GOPATH, JAVA_HOME, ANDROID_HOME, etc.
+  - Tool initialization: NVM, PyEnv, RbEnv, Cargo/Rust
+  - PATH modifications
+  - Custom aliases and functions
+- **Smart**:
+  - Only extracts active (uncommented) lines
+  - Removes duplicates while preserving order
+  - Integrates seamlessly with zsh configuration
+- **Safe**:
+  - Preserves original `.bashrc` file
+  - Creates timestamped backups of existing `.zshrc`
+  - Works in both user and root installation modes
 
 ### Completion Features
 - Case-insensitive completion
@@ -157,7 +168,21 @@ zshconfig
 
 ## Customization
 
-Your `.zshrc` file is located at `~/.zshrc`. You can add your custom configurations at the bottom of the file.
+Your `.zshrc` file is located at `~/.zshrc`.
+
+**Important:** Add your custom configurations in the "User Configuration" section:
+```bash
+# ============================================
+# User Configuration
+# ============================================
+# Add your custom configurations below
+
+# Your custom aliases, functions, exports here
+alias myalias='echo "hello"'
+export MY_VAR="value"
+```
+
+This ensures your customizations are preserved during reinstallation.
 
 ### Change Theme
 
@@ -180,11 +205,34 @@ plugins=(
 )
 ```
 
-## Backup
+## Backup and Reinstallation
 
+### Automatic Backup
 The installation script automatically backs up your existing `.zshrc` to:
 ```
 ~/.zshrc.backup.YYYYMMDD_HHMMSS
+```
+
+### Safe Reinstallation
+When you reinstall zsh-setup, the script intelligently:
+- ✅ **Preserves user custom configurations** added to "User Configuration" section
+- ✅ **Prevents duplicates** from .bashrc migration
+- ✅ **Updates to latest template** while keeping your customizations
+- ✅ **Creates backup** before making any changes
+
+**Example reinstallation workflow:**
+```bash
+# First installation
+curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | bash
+
+# User adds custom aliases to ~/.zshrc
+echo 'alias myproject="cd ~/projects/myapp"' >> ~/.zshrc
+
+# Later, reinstall to get updates
+curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/auto-install.sh | bash
+# ✓ Template updated
+# ✓ .bashrc content refreshed
+# ✓ Custom aliases preserved!
 ```
 
 ## Troubleshooting

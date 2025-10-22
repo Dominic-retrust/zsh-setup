@@ -1,6 +1,3 @@
-# Path to your Oh My Zsh installation.
-export ZSH="$HOME/.oh-my-zsh"
-
 # Set theme
 ZSH_THEME="robbyrussell"
 
@@ -14,6 +11,9 @@ plugins=(
   colored-man-pages
 )
 
+# Path to your Oh My Zsh installation.
+# IMPORTANT: Must be set right before sourcing oh-my-zsh.sh
+export ZSH="$HOME/.oh-my-zsh"
 source $ZSH/oh-my-zsh.sh
 
 # ============================================
