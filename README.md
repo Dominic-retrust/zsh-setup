@@ -16,13 +16,13 @@ Quick and easy zsh installation and configuration script with powerful features.
 
 ```bash
 # One-line installation
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/zsh-setup/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Dominic-retrust/zsh-setup/main/install.sh | bash
 ```
 
 Or clone and run:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/zsh-setup.git
+git clone https://github.com/Dominic-retrust/zsh-setup.git
 cd zsh-setup
 chmod +x install.sh
 ./install.sh
