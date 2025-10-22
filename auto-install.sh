@@ -144,12 +144,42 @@ main() {
 
     # Set zsh as default shell
     print_step "Setting zsh as default shell"
-    if [ "$SHELL" != "$(which zsh)" ]; then
-        if sudo chsh -s "$(which zsh)" "$USER"; then
-            print_success "Default shell changed to zsh"
+    CURRENT_SHELL=$(getent passwd "$USER" | cut -d: -f7)
+    ZSH_PATH=$(which zsh)
+
+    if [ "$CURRENT_SHELL" != "$ZSH_PATH" ]; then
+        print_info "Current shell: $CURRENT_SHELL"
+        print_info "Changing to: $ZSH_PATH"
+
+        # Try to change shell
+        if command_exists chsh; then
+            if sudo chsh -s "$ZSH_PATH" "$USER" 2>/dev/null; then
+                print_success "Default shell changed to zsh"
+                print_warning "Please log out and log back in for changes to take effect"
+            else
+                print_warning "Automatic shell change failed. Trying alternative method..."
+                # Alternative: using usermod
+                if sudo usermod -s "$ZSH_PATH" "$USER" 2>/dev/null; then
+                    print_success "Default shell changed to zsh (via usermod)"
+                    print_warning "Please log out and log back in for changes to take effect"
+                else
+                    print_error "Failed to change default shell automatically."
+                    echo ""
+                    echo "Please run this command manually:"
+                    echo "  sudo chsh -s \$(which zsh) \$USER"
+                    echo "or:"
+                    echo "  sudo usermod -s \$(which zsh) \$USER"
+                fi
+            fi
         else
-            print_warning "Failed to change default shell. You can do it manually with:"
-            echo "  sudo chsh -s \$(which zsh) \$USER"
+            print_warning "chsh command not found. Using usermod..."
+            if sudo usermod -s "$ZSH_PATH" "$USER"; then
+                print_success "Default shell changed to zsh"
+                print_warning "Please log out and log back in for changes to take effect"
+            else
+                print_error "Failed to change shell. Please run manually:"
+                echo "  sudo usermod -s \$(which zsh) \$USER"
+            fi
         fi
     else
         print_success "zsh is already your default shell"
@@ -169,8 +199,8 @@ main() {
     echo "  • 10,000 command history"
     echo ""
     print_info "🎯 Next steps:"
-    echo "  1. Log out and log back in, or"
-    echo "  2. Run: zsh"
+    echo "  ⚠️  IMPORTANT: Log out and log back in for zsh to become default shell"
+    echo "  Or start zsh now with: zsh"
     echo ""
     print_info "⌨️  Key bindings:"
     echo "  • Ctrl+R    : Fuzzy history search"
